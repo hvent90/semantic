@@ -14,6 +14,16 @@ class ApiInfo(BaseModel):
     end_line: int = Field(description="The line number where the API definition ends.")
 
 
+class AnalysisFragment(BaseModel):
+    """
+    Represents partial analysis results from a single file parser.
+    """
+    file_extension: str = Field(description="The file extension, e.g., '.py', '.js'.")
+    apis: List[ApiInfo] = Field(description="APIs found in this specific file.")
+    skillsets: List[str] = Field(description="Technology tags identified from this file.")
+    source_file: str = Field(description="The path to the source file that was analyzed.")
+
+
 class DirectoryAnalysis(BaseModel):
     """
     Represents the complete analysis results for a single directory.
