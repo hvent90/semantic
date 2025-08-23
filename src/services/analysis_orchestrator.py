@@ -9,6 +9,7 @@ from models.data_models import DirectoryAnalysis, ApiInfo, AnalysisFragment
 from parsers.language_parser_interface import LanguageParserInterface
 from parsers.python_parser import PythonParser
 from services.llm_client import llm_client
+from services.config import SemanticConfig
 
 
 logger = logging.getLogger(__name__)
@@ -52,8 +53,11 @@ class AnalysisOrchestrator:
         """
         logger.info(f"Analyzing directory: {directory_path}")
         
+        # Create config object for file-level exclusions
+        config = SemanticConfig(directory_path.parent if directory_path.parent.exists() else directory_path)
+        
         # Get all source files in the directory (non-recursive)
-        source_files = self._get_source_files(directory_path)
+        source_files = self._get_source_files(directory_path, config)
         logger.debug(f"Found {len(source_files)} source files")
         
         # Analyze each file and collect file contents for LLM
@@ -97,12 +101,13 @@ class AnalysisOrchestrator:
             llm_skillsets
         )
     
-    def _get_source_files(self, directory_path: Path) -> List[Path]:
+    def _get_source_files(self, directory_path: Path, config: SemanticConfig = None) -> List[Path]:
         """
-        Get all source files in the directory.
+        Get all source files in the directory, respecting exclusion patterns.
         
         Args:
             directory_path: Path to scan for source files
+            config: Optional configuration object for exclusions
             
         Returns:
             List of source file paths
@@ -138,6 +143,12 @@ class AnalysisOrchestrator:
                 if (item.is_file() and 
                     item.suffix.lower() in source_extensions and
                     not item.name.startswith('.')):  # Skip hidden files
+                    
+                    # Check configuration-based exclusions if config is available
+                    if config and config.should_exclude_path(item):
+                        logger.debug(f"Excluding file {item} due to configuration")
+                        continue
+                        
                     source_files.append(item)
         except (PermissionError, OSError) as e:
             logger.warning(f"Could not access directory {directory_path}: {e}")

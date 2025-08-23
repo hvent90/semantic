@@ -149,8 +149,8 @@ class LLMUsageCollector:
         self._total_input_tokens += input_tokens
         self._total_output_tokens += output_tokens
         
-        # Log to console (structured format for CI/CD)
-        logger.info(f"LLM Usage: {json.dumps(metrics.to_dict(), indent=None)}")
+        # Log individual call with running totals
+        logger.info(f"LLM Call #{self._total_calls} ({operation_type}): {input_tokens}+{output_tokens}={total_tokens} tokens, ${estimated_cost:.4f} | Running total: {self._total_input_tokens + self._total_output_tokens} tokens, ${self._total_cost:.4f}")
         
         return metrics
     

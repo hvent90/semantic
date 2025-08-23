@@ -1,0 +1,13 @@
+# .semanticsrc Example
+# Defines which directories/files to explicitly ignore during traversal.
+exclude:
+- node_modules/
+- .venv/
+- venv/
+- '*.log'
+- dist/
+- build/
+- __pycache__/
+- .pytest_cache/
+- .git/
+- .DS_Store

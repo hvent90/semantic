@@ -1,8 +1,12 @@
 """Directory traversal engine for the Codebase Summarizer tool."""
 
 from pathlib import Path
-from typing import List, Generator
+from typing import List, Generator, Optional
 import os
+import logging
+from services.config import SemanticConfig
+
+logger = logging.getLogger(__name__)
 
 
 class TraversalEngine:
@@ -19,10 +23,17 @@ class TraversalEngine:
             root_path: The root directory to start traversal from
         """
         self.root_path = Path(root_path).resolve()
+        self.config = SemanticConfig(self.root_path)
+        
+        if self.config.has_config_file():
+            logger.info("Using configuration from .semanticsrc")
+        else:
+            logger.debug("No .semanticsrc found, using default exclusions")
         
     def should_skip_directory(self, directory: Path) -> bool:
         """
         Determine if a directory should be skipped during traversal.
+        First checks configuration exclusions, then falls back to default skip patterns.
         
         Args:
             directory: The directory path to check
@@ -30,17 +41,23 @@ class TraversalEngine:
         Returns:
             True if the directory should be skipped, False otherwise
         """
-        skip_patterns = {
+        # Check configuration-based exclusions first
+        if self.config.should_exclude_path(directory):
+            return True
+        
+        # Default skip patterns for common directories that should always be excluded
+        default_skip_patterns = {
             '.git', '.hg', '.svn',  # Version control directories
             '__pycache__', '.pytest_cache',  # Python cache directories
-            'node_modules',  # Node.js dependencies
+            'node_modules',  # Node.js dependencies  
             '.venv', 'venv', 'env',  # Virtual environments
             'dist', 'build',  # Build directories
             '.idea', '.vscode',  # IDE directories
-            '.DS_Store'  # macOS system files
         }
         
-        return directory.name in skip_patterns or directory.name.startswith('.')
+        return directory.name in default_skip_patterns or (
+            directory.name.startswith('.') and directory.name not in {'.', '..'}
+        )
         
     def get_directories_to_process(self) -> Generator[Path, None, None]:
         """
