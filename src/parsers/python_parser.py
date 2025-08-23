@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Set
 from .language_parser_interface import LanguageParserInterface
 from models.data_models import AnalysisFragment, ApiInfo
+from services.llm_client import llm_client
 
 
 class PythonParser(LanguageParserInterface):
@@ -165,7 +166,7 @@ class PythonParser(LanguageParserInterface):
     
     def _create_async_function_api_info(self, node: ast.AsyncFunctionDef, file_path: str, lines: List[str]) -> ApiInfo:
         """Create ApiInfo for an async function."""
-        semantic_desc = self._generate_semantic_description(node, lines)
+        semantic_desc = self._generate_async_semantic_description(node, lines)
         end_line = self._find_end_line(node, lines)
         
         return ApiInfo(
@@ -190,8 +191,8 @@ class PythonParser(LanguageParserInterface):
         )
     
     def _generate_semantic_description(self, node: ast.FunctionDef, lines: List[str]) -> str:
-        """Generate semantic description for a function."""
-        # Try to extract docstring first
+        """Generate semantic description for a function using LLM or fallback methods."""
+        # Try to extract docstring first as it's authoritative
         if (node.body and 
             isinstance(node.body[0], ast.Expr) and 
             isinstance(node.body[0].value, ast.Str)):
@@ -200,6 +201,16 @@ class PythonParser(LanguageParserInterface):
             first_line = docstring.split('\n')[0].strip()
             if first_line:
                 return first_line
+        
+        # Try to use LLM for semantic description
+        if llm_client.is_available():
+            api_code = self._extract_function_code(node, lines)
+            if api_code:
+                llm_description = llm_client.generate_api_description(
+                    api_code, node.name, "python_file"
+                )
+                if llm_description and llm_description != f"Function {node.name} in python_file":
+                    return llm_description
         
         # Fallback: Generate description based on function name and structure
         name_desc = self._describe_function_name(node.name)
@@ -224,9 +235,34 @@ class PythonParser(LanguageParserInterface):
         
         return name_desc
     
+    def _generate_async_semantic_description(self, node: ast.AsyncFunctionDef, lines: List[str]) -> str:
+        """Generate semantic description for an async function using LLM or fallback methods."""
+        # Try to extract docstring first as it's authoritative
+        if (node.body and 
+            isinstance(node.body[0], ast.Expr) and 
+            isinstance(node.body[0].value, ast.Str)):
+            docstring = node.body[0].value.s
+            # Return first line of docstring, cleaned up
+            first_line = docstring.split('\n')[0].strip()
+            if first_line:
+                return first_line
+        
+        # Try to use LLM for semantic description
+        if llm_client.is_available():
+            api_code = self._extract_async_function_code(node, lines)
+            if api_code:
+                llm_description = llm_client.generate_api_description(
+                    api_code, f"async {node.name}", "python_file"
+                )
+                if llm_description and llm_description != f"Function async {node.name} in python_file":
+                    return llm_description
+        
+        # Fallback: Generate description based on function name and structure
+        return f"Async function that handles {node.name.replace('_', ' ').lower()}"
+    
     def _generate_class_semantic_description(self, node: ast.ClassDef, lines: List[str]) -> str:
-        """Generate semantic description for a class."""
-        # Try to extract docstring first
+        """Generate semantic description for a class using LLM or fallback methods."""
+        # Try to extract docstring first as it's authoritative
         if (node.body and 
             isinstance(node.body[0], ast.Expr) and 
             isinstance(node.body[0].value, ast.Str)):
@@ -235,7 +271,17 @@ class PythonParser(LanguageParserInterface):
             if first_line:
                 return first_line
         
-        # Check for common class patterns
+        # Try to use LLM for semantic description
+        if llm_client.is_available():
+            api_code = self._extract_class_code(node, lines)
+            if api_code:
+                llm_description = llm_client.generate_api_description(
+                    api_code, f"class {node.name}", "python_file"
+                )
+                if llm_description and llm_description != f"Function class {node.name} in python_file":
+                    return llm_description
+        
+        # Fallback: Check for common class patterns
         if any(isinstance(base, ast.Name) and 'Exception' in base.id for base in node.bases if hasattr(base, 'id')):
             return f"Custom exception class"
         elif any(isinstance(base, ast.Name) and base.id in ['BaseModel', 'Model'] for base in node.bases if hasattr(base, 'id')):
@@ -248,6 +294,52 @@ class PythonParser(LanguageParserInterface):
             return f"Manager class for handling operations"
         
         return f"Class defining {node.name.replace('_', ' ').lower()} functionality"
+    
+    def _extract_function_code(self, node: ast.FunctionDef, lines: List[str]) -> str:
+        """Extract the complete code for a function."""
+        try:
+            start_line = node.lineno - 1  # Convert to 0-based indexing
+            end_line = self._find_end_line(node, lines)
+            
+            if start_line < len(lines) and end_line <= len(lines):
+                function_lines = lines[start_line:end_line]
+                return '\n'.join(function_lines)
+        except Exception:
+            pass
+        return ""
+    
+    def _extract_async_function_code(self, node: ast.AsyncFunctionDef, lines: List[str]) -> str:
+        """Extract the complete code for an async function."""
+        try:
+            start_line = node.lineno - 1  # Convert to 0-based indexing
+            end_line = self._find_end_line(node, lines)
+            
+            if start_line < len(lines) and end_line <= len(lines):
+                function_lines = lines[start_line:end_line]
+                return '\n'.join(function_lines)
+        except Exception:
+            pass
+        return ""
+    
+    def _extract_class_code(self, node: ast.ClassDef, lines: List[str]) -> str:
+        """Extract the complete code for a class (or first few methods if too long)."""
+        try:
+            start_line = node.lineno - 1  # Convert to 0-based indexing
+            end_line = self._find_end_line(node, lines)
+            
+            if start_line < len(lines) and end_line <= len(lines):
+                class_lines = lines[start_line:end_line]
+                class_code = '\n'.join(class_lines)
+                
+                # If class is very long, truncate to first 50 lines for LLM analysis
+                if len(class_lines) > 50:
+                    truncated_lines = class_lines[:50]
+                    class_code = '\n'.join(truncated_lines) + '\n    # ... (truncated)'
+                
+                return class_code
+        except Exception:
+            pass
+        return ""
     
     def _describe_function_name(self, name: str) -> str:
         """Convert function name to human readable description."""

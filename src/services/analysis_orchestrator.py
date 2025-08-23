@@ -8,6 +8,7 @@ from collections import defaultdict
 from models.data_models import DirectoryAnalysis, ApiInfo, AnalysisFragment
 from parsers.language_parser_interface import LanguageParserInterface
 from parsers.python_parser import PythonParser
+from services.llm_client import llm_client
 
 
 logger = logging.getLogger(__name__)
@@ -55,25 +56,45 @@ class AnalysisOrchestrator:
         source_files = self._get_source_files(directory_path)
         logger.debug(f"Found {len(source_files)} source files")
         
-        # Analyze each file
+        # Analyze each file and collect file contents for LLM
         analysis_fragments = []
         file_type_counts = defaultdict(int)
+        file_contents_for_llm = []
         
         for file_path in source_files:
             # Count file types
             file_extension = file_path.suffix.lower()
             file_type_counts[file_extension] += 1
             
+            # Collect file content for LLM analysis (limit file size)
+            try:
+                if file_path.stat().st_size < 50_000:  # Skip very large files (50KB limit)
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        file_contents_for_llm.append(content)
+            except (IOError, UnicodeDecodeError) as e:
+                logger.debug(f"Could not read file for LLM analysis {file_path}: {e}")
+            
             # Find appropriate parser and analyze the file
             fragment = self._analyze_file(file_path)
             if fragment:
                 analysis_fragments.append(fragment)
         
+        # Use LLM to generate skillsets based on file contents
+        llm_skillsets = []
+        if llm_client.is_available() and file_contents_for_llm:
+            logger.debug("Using LLM for skillset detection")
+            llm_skillsets = llm_client.generate_skillsets(
+                file_contents_for_llm, 
+                str(directory_path)
+            )
+        
         # Aggregate results from all fragments
         return self._aggregate_analysis_results(
             str(directory_path),
             analysis_fragments,
-            dict(file_type_counts)
+            dict(file_type_counts),
+            llm_skillsets
         )
     
     def _get_source_files(self, directory_path: Path) -> List[Path]:
@@ -178,7 +199,8 @@ class AnalysisOrchestrator:
         self,
         directory_path: str,
         fragments: List[AnalysisFragment],
-        file_type_counts: Dict[str, int]
+        file_type_counts: Dict[str, int],
+        llm_skillsets: List[str] = None
     ) -> DirectoryAnalysis:
         """
         Aggregate analysis fragments into a single DirectoryAnalysis.
@@ -187,6 +209,7 @@ class AnalysisOrchestrator:
             directory_path: Path to the analyzed directory
             fragments: List of analysis fragments from individual files
             file_type_counts: Dictionary mapping file extensions to counts
+            llm_skillsets: Optional list of skillsets from LLM analysis
             
         Returns:
             Aggregated DirectoryAnalysis object
@@ -198,6 +221,11 @@ class AnalysisOrchestrator:
         for fragment in fragments:
             all_apis.extend(fragment.apis)
             skillset_set.update(fragment.skillsets)
+        
+        # Add LLM-generated skillsets if available
+        if llm_skillsets:
+            skillset_set.update(llm_skillsets)
+            logger.debug(f"Added LLM skillsets: {llm_skillsets}")
         
         # Sort APIs by source file and line number for consistent output
         all_apis.sort(key=lambda api: (api.source_file, api.start_line))
