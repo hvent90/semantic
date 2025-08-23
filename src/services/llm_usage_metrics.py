@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 class LLMProvider(Enum):
     """Supported LLM providers."""
     OPENAI = "openai"
-    ANTHROPIC = "anthropic"
 
 
 @dataclass
@@ -62,11 +61,6 @@ class LLMUsageCollector:
             "gpt-5": {"input": 0.00125, "output": 0.01},
             "gpt-5-mini": {"input": 0.00025, "output": 0.002},
             "gpt-5-nano": {"input": 0.00005, "output": 0.0004},
-        },
-        LLMProvider.ANTHROPIC: {
-            "claude-3-opus": {"input": 0.015, "output": 0.075},
-            "claude-3-sonnet": {"input": 0.003, "output": 0.015},
-            "claude-3-haiku": {"input": 0.00025, "output": 0.00125},
         }
     }
     

@@ -118,48 +118,5 @@ class VcsInterface:
             # If git commands fail, assume there might be changes
             return True
             
-    def get_metadata(self) -> Dict[str, Any]:
-        """
-        Get comprehensive VCS metadata for the current repository state.
+
         
-        Returns:
-            Dictionary containing commit hash and repository status information
-        """
-        metadata = {}
-        
-        if self.is_git_repository():
-            metadata['commit_hash'] = self.get_current_commit_hash()
-            metadata['short_commit_hash'] = self.get_short_commit_hash()
-            metadata['has_uncommitted_changes'] = self.has_uncommitted_changes()
-            metadata['vcs_type'] = 'git'
-        else:
-            metadata['commit_hash'] = 'UNCOMMITTED'
-            metadata['short_commit_hash'] = 'UNCOMMIT'
-            metadata['has_uncommitted_changes'] = True
-            metadata['vcs_type'] = None
-            
-        return metadata
-        
-    def get_branch_name(self) -> Optional[str]:
-        """
-        Get the current branch name.
-        
-        Returns:
-            The branch name, or None if not available
-        """
-        try:
-            result = subprocess.run(
-                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
-                cwd=self.repository_path,
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            
-            if result.returncode == 0:
-                return result.stdout.strip()
-            else:
-                return None
-                
-        except (subprocess.SubprocessError, FileNotFoundError):
-            return None

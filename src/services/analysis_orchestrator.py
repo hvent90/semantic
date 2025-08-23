@@ -6,9 +6,6 @@ from typing import List, Dict, Set
 from collections import defaultdict
 
 from models.data_models import DirectoryAnalysis, ApiInfo, AnalysisFragment
-from parsers.language_parser_interface import LanguageParserInterface
-from parsers.python_parser import PythonParser
-from parsers.javascript_parser import JavaScriptParser
 from services.llm_client import llm_client
 from services.config import SemanticConfig
 
@@ -18,30 +15,13 @@ logger = logging.getLogger(__name__)
 
 class AnalysisOrchestrator:
     """
-    Orchestrates the analysis of a directory by managing different language parsers
-    and aggregating their results into a comprehensive DirectoryAnalysis object.
+    Orchestrates the analysis of a directory using LLM-based analysis
+    and aggregating results into a comprehensive DirectoryAnalysis object.
     """
-    
+
     def __init__(self):
-        """Initialize the orchestrator with available language parsers."""
-        self.parsers: List[LanguageParserInterface] = []
-        self._register_default_parsers()
-    
-    def _register_default_parsers(self) -> None:
-        """Register the default set of language parsers."""
-        self.parsers.append(PythonParser())
-        self.parsers.append(JavaScriptParser())
-        logger.debug(f"Registered {len(self.parsers)} language parsers")
-    
-    def register_parser(self, parser: LanguageParserInterface) -> None:
-        """
-        Register a new language parser with the orchestrator.
-        
-        Args:
-            parser: A language parser implementing LanguageParserInterface
-        """
-        self.parsers.append(parser)
-        logger.debug(f"Registered parser: {type(parser).__name__}")
+        """Initialize the orchestrator for LLM-based analysis."""
+        logger.debug("Initialized AnalysisOrchestrator with LLM-based analysis")
     
     def analyze_directory(self, directory_path: Path) -> DirectoryAnalysis:
         """
@@ -95,15 +75,12 @@ class AnalysisOrchestrator:
             except (IOError, UnicodeDecodeError) as e:
                 logger.debug(f"Could not read file for analysis {file_path}: {e}")
             
-            # Find appropriate parser and analyze the file
-            fragment = self._analyze_file(file_path)
-            if fragment:
-                analysis_fragments.append(fragment)
+            # Note: Parser-based analysis removed - using LLM analysis only
         
-        # Aggregate results from all fragments, including comprehensive LLM analysis
+        # Aggregate results from LLM analysis only (parsers removed)
         return self._aggregate_analysis_results(
             str(directory_path),
-            analysis_fragments,
+            [],  # No parser fragments since parsers are removed
             dict(file_type_counts),
             all_llm_skillsets,  # Now comes from comprehensive per-file analysis
             all_llm_apis
@@ -163,56 +140,7 @@ class AnalysisOrchestrator:
         
         return sorted(source_files)
     
-    def _analyze_file(self, file_path: Path) -> AnalysisFragment:
-        """
-        Analyze a single file using the appropriate parser.
-        
-        Args:
-            file_path: Path to the file to analyze
-            
-        Returns:
-            AnalysisFragment if parsing succeeded, None otherwise
-        """
-        # Find a parser that supports this file extension
-        parser = self._find_parser_for_file(file_path)
-        if not parser:
-            logger.debug(f"No parser found for file: {file_path}")
-            return None
-        
-        try:
-            # Read file content
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            # Parse the file
-            fragment = parser.parse(content, str(file_path))
-            logger.debug(f"Successfully parsed {file_path} with {type(parser).__name__}")
-            return fragment
-            
-        except (IOError, UnicodeDecodeError) as e:
-            logger.warning(f"Could not read file {file_path}: {e}")
-            return None
-        except Exception as e:
-            logger.warning(f"Error parsing {file_path} with {type(parser).__name__}: {e}")
-            return None
-    
-    def _find_parser_for_file(self, file_path: Path) -> LanguageParserInterface:
-        """
-        Find the appropriate parser for a given file.
-        
-        Args:
-            file_path: Path to the file
-            
-        Returns:
-            Parser that supports the file, or None if none found
-        """
-        file_extension = file_path.suffix.lower()
-        
-        for parser in self.parsers:
-            if parser.supports_extension(file_extension):
-                return parser
-        
-        return None
+
     
     def _aggregate_analysis_results(
         self,
@@ -279,12 +207,31 @@ class AnalysisOrchestrator:
     
     def get_supported_extensions(self) -> List[str]:
         """
-        Get all file extensions supported by registered parsers.
-        
+        Get all file extensions supported by the analysis system.
+        Since parsers are removed, this returns a comprehensive list of common source file extensions.
+
         Returns:
             List of supported file extensions
         """
-        extensions = set()
-        for parser in self.parsers:
-            extensions.update(parser.get_supported_extensions())
-        return sorted(list(extensions))
+        return [
+            '.py', '.pyi',  # Python
+            '.js', '.jsx', '.ts', '.tsx', '.mjs',  # JavaScript/TypeScript
+            '.java', '.kt', '.scala',  # JVM languages
+            '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx',  # C/C++
+            '.rs',  # Rust
+            '.go',  # Go
+            '.rb',  # Ruby
+            '.php',  # PHP
+            '.cs',  # C#
+            '.swift',  # Swift
+            '.m', '.mm',  # Objective-C
+            '.r', '.R',  # R
+            '.sql',  # SQL
+            '.sh', '.bash', '.zsh',  # Shell scripts
+            '.ps1',  # PowerShell
+            '.yaml', '.yml',  # YAML
+            '.json',  # JSON
+            '.toml',  # TOML
+            '.ini', '.cfg', '.conf',  # Configuration files
+            '.md', '.rst',  # Documentation
+        ]

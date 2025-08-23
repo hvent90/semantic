@@ -221,34 +221,5 @@ class SummaryGenerator:
         
         return toc_entries, total_toc_lines
         
-    def write_to_file(self, content: AgentsMdContent, output_path: Path) -> None:
-        """
-        Write the .semantic content to a file.
-        
-        Args:
-            content: The structured content to write
-            output_path: Path where to write the .semantic file
-        """
-        xml_content = self.serialize_to_xml(content)
-        
-        # Ensure the directory exists
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Write the file
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(xml_content)
+
             
-    def create_metadata(self, commit_hash: str = "UNCOMMITTED") -> Dict[str, str]:
-        """
-        Create metadata dictionary with current timestamp and commit hash.
-        
-        Args:
-            commit_hash: The commit hash, defaults to UNCOMMITTED
-            
-        Returns:
-            Dictionary with metadata fields
-        """
-        return {
-            'last_generated_utc': datetime.utcnow().isoformat() + 'Z',
-            'commit_hash': commit_hash
-        }

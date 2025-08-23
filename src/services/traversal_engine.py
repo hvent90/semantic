@@ -125,26 +125,7 @@ class TraversalEngine:
             
         return False
         
-    def get_source_files_in_directory(self, directory: Path) -> List[Path]:
-        """
-        Get all source files in a specific directory (non-recursive).
-        
-        Args:
-            directory: The directory to scan for source files
-            
-        Returns:
-            List of Path objects for source files in the directory
-        """
-        source_files = []
-        
-        try:
-            for item in sorted(directory.iterdir()):
-                if item.is_file() and self._is_source_file(item):
-                    source_files.append(item)
-        except (PermissionError, OSError):
-            pass
-            
-        return source_files
+
         
     def _is_source_file(self, file_path: Path) -> bool:
         """
