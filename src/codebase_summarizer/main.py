@@ -43,9 +43,7 @@ def generate(
     import logging
     from services.traversal_engine import TraversalEngine
     from services.analysis_orchestrator import AnalysisOrchestrator
-    from services.summary_generator import SummaryGenerator
-    from services.vcs_interface import VcsInterface
-    
+
     target_path = path or Path.cwd()
     
     # Configure logging
@@ -71,12 +69,7 @@ def generate(
         # Initialize components
         traversal_engine = TraversalEngine(target_path)
         orchestrator = AnalysisOrchestrator()
-        generator = SummaryGenerator()
-        vcs = VcsInterface(target_path)
-        
-        # Get commit hash for metadata
-        commit_hash = vcs.get_current_commit_hash()
-        
+
         # Process directories in parallel with rate limiting
         directories_processed = asyncio.run(_process_directories_async(
             traversal_engine, orchestrator, logger, force, max_concurrent=15
