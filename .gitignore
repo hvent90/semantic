@@ -54,5 +54,5 @@ Thumbs.db
 agents.md
 *.log
 .summarizerrc
-
+.semantic
 .env

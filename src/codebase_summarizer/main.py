@@ -1,8 +1,12 @@
 """Main CLI entry point for the Codebase Summarizer tool."""
 
 import typer
+import asyncio
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
+
+from services.config import SemanticConfig
+from services.llm_client import llm_client
 
 app = typer.Typer(
     name="semantic",
@@ -73,30 +77,10 @@ def generate(
         # Get commit hash for metadata
         commit_hash = vcs.get_current_commit_hash()
         
-        # Process each directory
-        directories_processed = 0
-        for directory in traversal_engine.get_directories_to_process():
-            logger.info(f"Processing directory: {directory}")
-            
-            # Skip if .semantic exists and force is not enabled
-            semantic_file = directory / ".semantic"
-            if semantic_file.exists() and not force:
-                logger.info(f"Skipping {directory}: .semantic already exists (use --force to regenerate)")
-                continue
-            
-            # Analyze the directory
-            analysis = orchestrator.analyze_directory(directory)
-            
-            # Generate metadata
-            metadata = generator.create_metadata(commit_hash)
-            
-            # Generate content
-            content = generator.generate_semantic_content(analysis, metadata)
-            
-            # Write to file
-            generator.write_to_file(content, semantic_file)
-            logger.info(f"Generated .semantic for {directory}")
-            directories_processed += 1
+        # Process directories in parallel with rate limiting
+        directories_processed = asyncio.run(_process_directories_async(
+            traversal_engine, orchestrator, logger, force, max_concurrent=15
+        ))
         
         typer.echo(f"✓ Successfully processed {directories_processed} directories")
         
@@ -243,6 +227,117 @@ def _filter_metadata_lines(lines: list) -> list:
             continue
         filtered.append(line)
     return filtered
+
+
+async def _process_directories_async(traversal_engine, orchestrator, logger, force: bool, max_concurrent: int = 5) -> int:
+    """
+    Process directories asynchronously with semaphore-based rate limiting.
+    
+    Args:
+        traversal_engine: Engine to get directories to process
+        orchestrator: Analysis orchestrator
+        logger: Logger instance
+        force: Whether to force regeneration
+        max_concurrent: Maximum number of concurrent LLM operations
+        
+    Returns:
+        Number of directories processed
+    """
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async def _process_single_directory(directory):
+        """Process a single directory with semaphore protection."""
+        async with semaphore:
+            logger.info(f"Processing directory: {directory}")
+            
+            # Skip if .semantic exists and force is not enabled
+            semantic_file = directory / ".semantic"
+            if semantic_file.exists() and not force:
+                logger.info(f"Skipping {directory}: .semantic already exists (use --force to regenerate)")
+                return False
+
+            # Collect file contents from the directory
+            file_contents_str = ""
+
+            # Get all source files in the directory (non-recursive)
+            config = SemanticConfig(directory.parent if directory.parent.exists() else directory)
+            source_files = orchestrator._get_source_files(directory, config)
+            logger.debug(f"Found {len(source_files)} source files")
+
+            for file_path in source_files:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        file_content = f.read()
+                        # Get file extension for syntax highlighting
+                        file_extension = file_path.suffix.lstrip('.')
+                        file_contents_str += f"\n### File: {file_path.name}\n"
+                        file_contents_str += f"```{file_extension}\n"
+                        file_contents_str += file_content
+                        file_contents_str += "\n```\n"
+                except (IOError, UnicodeDecodeError) as e:
+                    logger.warning(f"Could not read file {file_path}: {e}")
+                    file_contents_str += f"\n### File: {file_path.name}\n"
+                    file_contents_str += f"[Error reading file: {e}]\n"
+            
+            prompt = f"""You are an expert technical documentation generator that creates semantic summary files for AI coding agents.
+
+            Your role is to generate a structured overview of a codebase directory for AI agents to understand and navigate effectively.
+
+            Here is an example of the expected format:
+
+            ```markdown
+            ## Required Skillsets
+            - Python
+            - FastAPI
+            - SQL
+
+            ## APIs
+            ### `user_service.py`
+            class Authenticator (lines 10-100): Handles user authentication and authorization. 
+              - (lines 25-45) public getUserById(id: number) -> User: Fetches a user record from the database by their primary ID.
+              - (lines 58-70) public deleteUser(id: number) -> bool: Removes a user record from the database.
+            ```
+
+            Requirements: 
+            - Format APIs grouped by source file with proper markdown formatting
+            - Include line numbers where applicable
+            - Focus on APIs, classes, functions, and important interfaces
+            - Identify required skillsets/technologies used
+            - For each function and class, add a one or two sentence (MAX) description after writing the signature.
+
+            Now generate the complete file content for the files in this directory:
+
+            {file_contents_str}
+
+            Generate the complete overview now:"""
+
+            try:
+                content = await llm_client.summarize_async(prompt)
+
+                with open(semantic_file, 'w', encoding='utf-8') as f:
+                    f.write(content)
+
+                logger.info(f"Generated .semantic for {directory}")
+                return True
+            except Exception as e:
+                logger.error(f"Error processing directory {directory}: {e}")
+                return False
+    
+    # Create tasks for all directories
+    directories = list(traversal_engine.get_directories_to_process())
+    tasks = [_process_single_directory(directory) for directory in directories]
+    
+    # Process tasks and count successful completions
+    directories_processed = 0
+    for completed_task in asyncio.as_completed(tasks):
+        try:
+            success = await completed_task
+            if success:
+                directories_processed += 1
+        except Exception as e:
+            logger.error(f"Task failed: {e}")
+    
+    return directories_processed
 
 
 @app.command()

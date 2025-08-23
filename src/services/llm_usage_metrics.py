@@ -56,7 +56,12 @@ class LLMUsageCollector:
         LLMProvider.OPENAI: {
             "gpt-4": {"input": 0.03, "output": 0.06},
             "gpt-4-turbo": {"input": 0.01, "output": 0.03},
+            "gpt-4o": {"input": 0.005, "output": 0.015},
+            "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
             "gpt-3.5-turbo": {"input": 0.001, "output": 0.002},
+            "gpt-5": {"input": 0.00125, "output": 0.01},
+            "gpt-5-mini": {"input": 0.00025, "output": 0.002},
+            "gpt-5-nano": {"input": 0.00005, "output": 0.0004},
         },
         LLMProvider.ANTHROPIC: {
             "claude-3-opus": {"input": 0.015, "output": 0.075},
