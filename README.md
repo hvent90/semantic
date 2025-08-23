@@ -98,43 +98,7 @@ class Authenticator (lines 10-100): Handles user authentication and authorizatio
 Each `.semantic` file includes:
 - **Required Skillsets**: Technologies and expertise needed to work with the directory
 - **APIs**: Functions, classes, and interfaces with semantic descriptions
-- **Line Numbers**: Precise location references for navigation
-- **Semantic Descriptions**: AI-generated summaries of functionality
-
-## Architecture
-
-The system is built with several key components:
-
-- **TraversalEngine**: Handles directory traversal and file discovery
-- **AnalysisOrchestrator**: Orchestrates the analysis workflow
-- **SummaryGenerator**: Creates structured `.semantic` files
-- **LLMClient**: Interfaces with language models for semantic analysis
-- **VcsInterface**: Integrates with version control systems
-- **SemanticConfig**: Manages configuration and exclusion patterns
-
-## Use Cases
-
-### For AI Coding Agents
-- Quickly understand codebase structure without reading every file
-- Identify relevant files, APIs, and required expertise for tasks
-- Navigate efficiently while staying within operational context limits
-
-### For Developers
-- Integrate into existing development workflows (IDE, Version Control, CI/CD)
-- Ensure generated summaries are accurate and up-to-date
-- Improve effectiveness of AI coding assistant tools
-
-### For DevOps Engineers
-- Configure automatic generation in CI/CD pipelines
-- Maintain synchronized summaries with latest code changes
-- Monitor and track LLM usage costs
-
-## Performance
-
-- **Large Codebases**: Capable of processing repositories with 10,000+ files
-- **Medium Repositories**: Scans completed in under 5 minutes on typical CI/CD runners
-- **Directory Processing**: Individual directories (up to 100 files) processed in under 30 seconds
-- **Concurrent Processing**: Configurable parallelism with rate limiting (default: 15 concurrent operations)
+- **Line Numbers**: Precise location references for navigation for the AI agent to read a minimal amount from the desired file
 
 ## Requirements
 
@@ -155,47 +119,6 @@ The system is built with several key components:
 - `PyYAML` - Required for pre-commit hook installation
 - `pre-commit` - For automated hook-based generation
 
-## Development
-
-```bash
-# Install development dependencies
-pip install -e ".[dev]"
-
-# Run tests
-pytest
-
-# Code formatting
-black .
-isort .
-
-# Type checking
-mypy src/
-
-# Linting
-flake8 src/
-```
-
-## Future Roadmap
-
-- Plugin-based architecture for language extension
-- Advanced metadata analysis (dependencies, performance metrics)
-- Full IDE integration with user interface
-- Enhanced framework-specific summarization
-- Success metrics and analytics framework
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass and code is properly formatted
-6. Submit a pull request
-
 ## License
 
-MIT License - see LICENSE file for details.
-
-## Support
-
-For issues, feature requests, or questions, please use the GitHub issue tracker.
+MIT License
