@@ -1,4 +1,4 @@
-"""Summary generator for creating agents.md files."""
+"""Summary generator for creating .semantic files."""
 
 from datetime import datetime
 from pathlib import Path
@@ -8,17 +8,17 @@ from models.data_models import DirectoryAnalysis, AgentsMdContent, TocEntry
 
 class SummaryGenerator:
     """
-    Generates structured agents.md files from DirectoryAnalysis data.
-    Handles Table of Contents calculation and proper markdown formatting.
+    Generates structured .semantic files from DirectoryAnalysis data.
+    Handles Table of Contents calculation and proper XML tag formatting.
     """
     
     def __init__(self):
         """Initialize the summary generator."""
         pass
         
-    def generate_agents_md_content(self, analysis: DirectoryAnalysis, metadata: Dict[str, str]) -> AgentsMdContent:
+    def generate_semantic_content(self, analysis: DirectoryAnalysis, metadata: Dict[str, str]) -> AgentsMdContent:
         """
-        Generate the structured content for an agents.md file.
+        Generate the structured content for a .semantic file.
         
         Args:
             analysis: The directory analysis data
@@ -46,15 +46,15 @@ class SummaryGenerator:
             apis_summary=apis_summary
         )
         
-    def serialize_to_markdown(self, content: AgentsMdContent) -> str:
+    def serialize_to_xml(self, content: AgentsMdContent) -> str:
         """
-        Serialize the AgentsMdContent to a markdown string.
+        Serialize the AgentsMdContent to XML format.
         
         Args:
             content: The structured content to serialize
             
         Returns:
-            Complete markdown string for the agents.md file
+            Complete XML string for the .semantic file
         """
         lines = []
         
@@ -72,33 +72,37 @@ class SummaryGenerator:
         lines.append("")
         
         # Metadata section
-        lines.append("## Metadata")
+        lines.append("<Metadata>")
         for key, value in content.metadata.items():
             lines.append(f"- {key}: {value}")
+        lines.append("</Metadata>")
         lines.append("")
         
         # File Types section  
-        lines.append("## File Types")
+        lines.append("<FileTypes>")
         if content.file_types_summary:
             lines.extend(content.file_types_summary.split('\n'))
         else:
             lines.append("No source files found.")
+        lines.append("</FileTypes>")
         lines.append("")
         
         # Required Skillsets section
-        lines.append("## Required Skillsets")
+        lines.append("<RequiredSkillsets>")
         if content.required_skillsets_summary:
             lines.extend(content.required_skillsets_summary.split('\n'))
         else:
             lines.append("No specific skillsets identified.")
+        lines.append("</RequiredSkillsets>")
         lines.append("")
         
         # APIs section
-        lines.append("## APIs")
+        lines.append("<APIs>")
         if content.apis_summary:
             lines.extend(content.apis_summary.split('\n'))
         else:
             lines.append("No APIs found.")
+        lines.append("</APIs>")
             
         return '\n'.join(lines)
         
@@ -182,9 +186,9 @@ class SummaryGenerator:
         
         # Now calculate each section
         
-        # Metadata section (header + content + empty line)
+        # Metadata section (opening tag + content + closing tag + empty line)
         metadata_start = current_line
-        metadata_lines = 1 + 2 + 1  # header + 2 metadata items + empty line
+        metadata_lines = 1 + 2 + 1 + 1  # opening tag + 2 metadata items + closing tag + empty line
         metadata_end = current_line + metadata_lines - 1
         toc_entries.append(TocEntry(section_name="Metadata", start_line=metadata_start, end_line=metadata_end))
         current_line += metadata_lines
@@ -192,7 +196,7 @@ class SummaryGenerator:
         # File Types section
         file_types_start = current_line
         file_types_content_lines = len(file_types_summary.split('\n')) if file_types_summary else 1
-        file_types_lines = 1 + file_types_content_lines + 1  # header + content + empty line
+        file_types_lines = 1 + file_types_content_lines + 1 + 1  # opening tag + content + closing tag + empty line
         file_types_end = current_line + file_types_lines - 1
         toc_entries.append(TocEntry(section_name="File Types", start_line=file_types_start, end_line=file_types_end))
         current_line += file_types_lines
@@ -200,7 +204,7 @@ class SummaryGenerator:
         # Skillsets section
         skillsets_start = current_line
         skillsets_content_lines = len(skillsets_summary.split('\n')) if skillsets_summary else 1
-        skillsets_lines = 1 + skillsets_content_lines + 1  # header + content + empty line
+        skillsets_lines = 1 + skillsets_content_lines + 1 + 1  # opening tag + content + closing tag + empty line
         skillsets_end = current_line + skillsets_lines - 1
         toc_entries.append(TocEntry(section_name="Required Skillsets", start_line=skillsets_start, end_line=skillsets_end))
         current_line += skillsets_lines
@@ -208,7 +212,7 @@ class SummaryGenerator:
         # APIs section (no trailing empty line for last section)
         apis_start = current_line
         apis_content_lines = len(apis_summary.split('\n')) if apis_summary else 1
-        apis_lines = 1 + apis_content_lines  # header + content
+        apis_lines = 1 + apis_content_lines + 1  # opening tag + content + closing tag
         apis_end = current_line + apis_lines - 1
         toc_entries.append(TocEntry(section_name="APIs", start_line=apis_start, end_line=apis_end))
         
@@ -219,20 +223,20 @@ class SummaryGenerator:
         
     def write_to_file(self, content: AgentsMdContent, output_path: Path) -> None:
         """
-        Write the agents.md content to a file.
+        Write the .semantic content to a file.
         
         Args:
             content: The structured content to write
-            output_path: Path where to write the agents.md file
+            output_path: Path where to write the .semantic file
         """
-        markdown_content = self.serialize_to_markdown(content)
+        xml_content = self.serialize_to_xml(content)
         
         # Ensure the directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Write the file
         with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(markdown_content)
+            f.write(xml_content)
             
     def create_metadata(self, commit_hash: str = "UNCOMMITTED") -> Dict[str, str]:
         """

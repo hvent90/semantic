@@ -25,7 +25,7 @@ def generate(
     force: bool = typer.Option(
         False,
         "--force",
-        help="Force regeneration of all agents.md files, even if they appear up-to-date.",
+        help="Force regeneration of all .semantic files, even if they appear up-to-date.",
     ),
     verbose: bool = typer.Option(
         False,
@@ -34,7 +34,7 @@ def generate(
     ),
 ) -> None:
     """
-    The primary command to perform a one-time scan and generation of agents.md files.
+    The primary command to perform a one-time scan and generation of .semantic files.
     """
     import logging
     from services.traversal_engine import TraversalEngine
@@ -78,10 +78,10 @@ def generate(
         for directory in traversal_engine.get_directories_to_process():
             logger.info(f"Processing directory: {directory}")
             
-            # Skip if agents.md exists and force is not enabled
-            agents_file = directory / "agents.md"
-            if agents_file.exists() and not force:
-                logger.info(f"Skipping {directory}: agents.md already exists (use --force to regenerate)")
+            # Skip if .semantic exists and force is not enabled
+            semantic_file = directory / ".semantic"
+            if semantic_file.exists() and not force:
+                logger.info(f"Skipping {directory}: .semantic already exists (use --force to regenerate)")
                 continue
             
             # Analyze the directory
@@ -91,11 +91,11 @@ def generate(
             metadata = generator.create_metadata(commit_hash)
             
             # Generate content
-            content = generator.generate_agents_md_content(analysis, metadata)
+            content = generator.generate_semantic_content(analysis, metadata)
             
             # Write to file
-            generator.write_to_file(content, agents_file)
-            logger.info(f"Generated agents.md for {directory}")
+            generator.write_to_file(content, semantic_file)
+            logger.info(f"Generated .semantic for {directory}")
             directories_processed += 1
         
         typer.echo(f"✓ Successfully processed {directories_processed} directories")
@@ -125,7 +125,7 @@ def verify(
     ),
 ) -> None:
     """
-    A command intended for CI/CD pipelines to verify that committed agents.md files 
+    A command intended for CI/CD pipelines to verify that committed .semantic files 
     are in sync with the source code. Exits with non-zero status code if out of sync.
     """
     import logging
@@ -158,14 +158,14 @@ def verify(
         out_of_sync_files = []
         directories_checked = 0
         
-        # Process each directory that should have an agents.md file
+        # Process each directory that should have a .semantic file
         for directory in traversal_engine.get_directories_to_process():
             logger.debug(f"Checking directory: {directory}")
             
-            agents_file = directory / "agents.md"
-            if not agents_file.exists():
-                logger.warning(f"Missing agents.md file: {agents_file}")
-                out_of_sync_files.append(str(agents_file))
+            semantic_file = directory / ".semantic"
+            if not semantic_file.exists():
+                logger.warning(f"Missing .semantic file: {semantic_file}")
+                out_of_sync_files.append(str(semantic_file))
                 continue
             
             # Analyze the directory to get current state
@@ -173,22 +173,22 @@ def verify(
             
             # Generate what the current content should be
             metadata = generator.create_metadata(commit_hash)
-            expected_content = generator.generate_agents_md_content(analysis, metadata)
-            expected_markdown = generator.serialize_to_markdown(expected_content)
+            expected_content = generator.generate_semantic_content(analysis, metadata)
+            expected_xml = generator.serialize_to_xml(expected_content)
             
             # Read the existing file
             try:
-                with open(agents_file, 'r', encoding='utf-8') as f:
-                    actual_markdown = f.read()
+                with open(semantic_file, 'r', encoding='utf-8') as f:
+                    actual_xml = f.read()
             except (IOError, UnicodeDecodeError) as e:
-                logger.error(f"Could not read {agents_file}: {e}")
-                out_of_sync_files.append(str(agents_file))
+                logger.error(f"Could not read {semantic_file}: {e}")
+                out_of_sync_files.append(str(semantic_file))
                 continue
             
             # Compare content intelligently (ignore metadata differences)
-            if not _content_matches(actual_markdown, expected_markdown):
-                logger.warning(f"Content mismatch: {agents_file}")
-                out_of_sync_files.append(str(agents_file))
+            if not _content_matches(actual_xml, expected_xml):
+                logger.warning(f"Content mismatch: {semantic_file}")
+                out_of_sync_files.append(str(semantic_file))
             
             directories_checked += 1
         
@@ -214,7 +214,7 @@ def verify(
 
 def _content_matches(actual: str, expected: str) -> bool:
     """
-    Compare two agents.md contents, ignoring metadata differences.
+    Compare two .semantic contents, ignoring metadata differences.
     This function intelligently ignores fields like last_generated_utc and commit_hash
     that are expected to differ between runs.
     """
@@ -318,7 +318,7 @@ def hook_install(
                     "hooks": [
                         {
                             "id": "generate-summaries",
-                            "name": "Generate agents.md summaries", 
+                            "name": "Generate .semantic summaries", 
                             "entry": "semantic generate .",
                             "language": "system",
                             "files": r"\.(py|js|go|ts|tsx|jsx|java|kt|scala|c|cpp|cc|cxx|h|hpp|rs|rb|php|cs|swift|r|R|sql|sh|bash|yaml|yml|json|toml|ini|cfg|md|rst)$",
