@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 app = typer.Typer(
-    name="summarizer",
+    name="semantic",
     help="A CLI tool that generates semantic summaries of codebases for AI coding agents",
     add_completion=False,
 )
@@ -72,13 +72,11 @@ def verify(
     typer.echo("Verification logic not yet implemented")
 
 
-@app.command("hook")
-def hook_command() -> None:
-    """Hook management commands."""
-    typer.echo("Hook command called - use subcommands")
+hook_app = typer.Typer(help="Hook management commands")
+app.add_typer(hook_app, name="hook")
 
 
-@hook_command.command("install")
+@hook_app.command("install")
 def hook_install(
     hook_type: str = typer.Option(
         "pre-commit",

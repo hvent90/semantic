@@ -3,13 +3,13 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "codebase-summarizer"
+name = "semantic"
 version = "0.1.0"
 description = "A CLI tool that generates semantic summaries of codebases for AI coding agents"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
-    {name = "Codebase Summarizer Team"}
+    {name = "Semantic Team"}
 ]
 keywords = ["cli", "codebase", "analysis", "ai", "summarization"]
 classifiers = [
@@ -40,7 +40,7 @@ dev = [
 ]
 
 [project.scripts]
-summarizer = "codebase_summarizer.main:app"
+semantic = "codebase_summarizer.main:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
