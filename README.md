@@ -4,7 +4,7 @@ A CLI tool that generates semantic summaries of codebases for AI coding agents.
 
 ## Overview
 
-Semantic creates a "semantic layer" over software codebases, enabling AI coding agents to gain high-level understanding of project structure and content without processing every individual file. The tool generates concise, machine-readable summary files (`.semantic`) within each directory, providing essential context in a token-efficient manner.
+Semantic creates a "semantic layer" over software codebases, enabling AI coding agents to gain high-level understanding of project structure and content without processing every individual file. The tool generates concise, machine-readable summary files (`agents.md` or `claude.md`) within each directory, providing essential context in a token-efficient manner.
 
 ## Problem Statement
 
@@ -36,8 +36,11 @@ semantic init
 ### Generate Summaries
 
 ```bash
-# Generate .semantic files for current directory
+# Generate agents.md files for current directory (default)
 semantic generate
+
+# Generate claude.md files
+semantic generate --output-format=claude
 
 # Generate for specific path
 semantic generate /path/to/codebase
@@ -61,10 +64,14 @@ pre-commit install
 
 ## Configuration
 
-The `.semanticsrc` file allows you to customize which files and directories to exclude:
+The `.semanticsrc` file allows you to customize the output format and which files and directories to exclude:
 
 ```yaml
 # .semanticsrc Example
+# Defines the output file format for generated summaries
+output_format: agents  # Options: agents, claude
+
+# Defines which directories/files to explicitly ignore during traversal
 exclude:
   - node_modules/
   - .venv/
@@ -80,7 +87,7 @@ exclude:
 
 ## Output Format
 
-Semantic generates `.semantic` files in each directory with the following structure:
+Semantic generates summary files (`agents.md` or `claude.md`) in each directory with the following structure:
 
 ```markdown
 ## Required Skillsets
@@ -95,7 +102,7 @@ class Authenticator (lines 10-100): Handles user authentication and authorizatio
   - (lines 58-70) public deleteUser(id: number) -> bool: Removes a user record from the database.
 ```
 
-Each `.semantic` file includes:
+Each summary file includes:
 - **Required Skillsets**: Technologies and expertise needed to work with the directory
 - **APIs**: Functions, classes, and interfaces with semantic descriptions
 - **Line Numbers**: Precise location references for navigation for the AI agent to read a minimal amount from the desired file
@@ -118,6 +125,20 @@ Each `.semantic` file includes:
 
 - `PyYAML` - Required for pre-commit hook installation
 - `pre-commit` - For automated hook-based generation
+
+### Examples
+
+```bash
+# Generate agents.md files (new default)
+semantic generate
+
+# Generate claude.md files
+semantic generate --output-format=claude
+
+# Set project default in .semanticsrc
+echo "output_format: claude" >> .semanticsrc
+semantic generate
+```
 
 ## License
 

@@ -117,10 +117,42 @@ class SemanticConfig:
         
         return False
     
+    def get_output_format(self) -> str:
+        """
+        Get the output format from configuration.
+
+        Returns:
+            Output format string ('agents' or 'claude')
+        """
+        format_value = self._config_data.get('output_format', 'agents')
+        valid_formats = {'agents', 'claude'}
+
+        if format_value not in valid_formats:
+            logger.warning(f"Invalid output_format '{format_value}' in .semanticsrc. Using 'agents'")
+            return 'agents'
+
+        return format_value
+
+    def format_to_filename(self, format_type: str) -> str:
+        """
+        Convert format type to filename.
+
+        Args:
+            format_type: The format type ('agents' or 'claude')
+
+        Returns:
+            Corresponding filename
+        """
+        format_mapping = {
+            'agents': 'agents.md',
+            'claude': 'claude.md'
+        }
+        return format_mapping.get(format_type, 'agents.md')
+
     def has_config_file(self) -> bool:
         """
         Check if a .semanticsrc file exists.
-        
+
         Returns:
             True if configuration file exists, False otherwise
         """
@@ -135,6 +167,7 @@ class SemanticConfig:
         """
         if HAS_YAML:
             example_config = {
+                'output_format': 'agents',  # Options: agents, claude
                 'exclude': [
                     'node_modules/',
                     '.venv/',
@@ -152,6 +185,9 @@ class SemanticConfig:
         else:
             # Fallback to manual YAML creation if PyYAML is not available
             return """# .semanticsrc Example
+# Defines the output file format for generated summaries
+output_format: agents  # Options: agents, claude
+
 # Defines which directories/files to explicitly ignore during traversal.
 exclude:
 - node_modules/

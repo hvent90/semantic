@@ -29,16 +29,25 @@ def generate(
     force: bool = typer.Option(
         False,
         "--force",
-        help="Force regeneration of all .semantic files, even if they appear up-to-date.",
+        help="Force regeneration of all summary files, even if they appear up-to-date.",
     ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
         help="Enable detailed logging output.",
     ),
+    output_format: str = typer.Option(
+        None,
+        "--output-format",
+        help="Output file format: agents or claude. Overrides .semanticsrc setting.",
+    ),
 ) -> None:
     """
-    The primary command to perform a one-time scan and generation of .semantic files.
+    The primary command to perform a one-time scan and generation of semantic summary files.
+
+    Output files are named based on the --output-format option or .semanticsrc configuration:
+    - agents: Creates agents.md files (default)
+    - claude: Creates claude.md files
     """
     import logging
     from services.traversal_engine import TraversalEngine
@@ -60,7 +69,7 @@ def generate(
         logging.getLogger("httpcore").setLevel(logging.WARNING)
         logging.getLogger("openai").setLevel(logging.WARNING)
     
-    logger.info(f"Generating summaries for codebase at: {target_path}")
+    logger.info(f"Generating semantic summaries for codebase at: {target_path}")
     
     if force:
         logger.info("Force regeneration enabled")
@@ -72,7 +81,7 @@ def generate(
 
         # Process directories in parallel with rate limiting
         directories_processed = asyncio.run(_process_directories_async(
-            traversal_engine, orchestrator, logger, force, max_concurrent=15
+            traversal_engine, orchestrator, logger, force, output_format, max_concurrent=15
         ))
         
         typer.echo(f"✓ Successfully processed {directories_processed} directories")
@@ -88,31 +97,37 @@ def generate(
         typer.echo(f"✗ Generation failed: {e}", err=True)
         raise typer.Exit(1)
 
-async def _process_directories_async(traversal_engine, orchestrator, logger, force: bool, max_concurrent: int = 5) -> int:
+async def _process_directories_async(traversal_engine, orchestrator, logger, force: bool, output_format: Optional[str] = None, max_concurrent: int = 5) -> int:
     """
     Process directories asynchronously with semaphore-based rate limiting.
-    
+
     Args:
         traversal_engine: Engine to get directories to process
         orchestrator: Analysis orchestrator
         logger: Logger instance
         force: Whether to force regeneration
+        output_format: Output format override from CLI
         max_concurrent: Maximum number of concurrent LLM operations
-        
+
     Returns:
         Number of directories processed
     """
     semaphore = asyncio.Semaphore(max_concurrent)
     
-    async def _process_single_directory(directory):
+    async def _process_single_directory(directory, output_format: Optional[str] = None):
         """Process a single directory with semaphore protection."""
         async with semaphore:
             logger.info(f"Processing directory: {directory}")
-            
-            # Skip if .semantic exists and force is not enabled
-            semantic_file = directory / ".semantic"
-            if semantic_file.exists() and not force:
-                logger.info(f"Skipping {directory}: .semantic already exists (use --force to regenerate)")
+
+            # Get output format from CLI option, config, or default
+            config = SemanticConfig(directory.parent if directory.parent.exists() else directory)
+            effective_format = output_format or config.get_output_format()
+            output_filename = config.format_to_filename(effective_format)
+            output_file = directory / output_filename
+
+            # Skip if output file exists and force is not enabled
+            if output_file.exists() and not force:
+                logger.info(f"Skipping {directory}: {output_filename} already exists (use --force to regenerate)")
                 return False
 
             # Collect file contents from the directory
@@ -173,10 +188,10 @@ async def _process_directories_async(traversal_engine, orchestrator, logger, for
             try:
                 content = await llm_client.summarize_async(prompt)
 
-                with open(semantic_file, 'w', encoding='utf-8') as f:
+                with open(output_file, 'w', encoding='utf-8') as f:
                     f.write(content)
 
-                logger.info(f"Generated .semantic for {directory}")
+                logger.info(f"Generated {output_filename} for {directory}")
                 return True
             except Exception as e:
                 logger.error(f"Error processing directory {directory}: {e}")
@@ -184,7 +199,7 @@ async def _process_directories_async(traversal_engine, orchestrator, logger, for
     
     # Create tasks for all directories
     directories = list(traversal_engine.get_directories_to_process())
-    tasks = [_process_single_directory(directory) for directory in directories]
+    tasks = [_process_single_directory(directory, output_format) for directory in directories]
     
     # Process tasks and count successful completions
     directories_processed = 0
@@ -272,7 +287,7 @@ def hook_install(
                     "hooks": [
                         {
                             "id": "generate-summaries",
-                            "name": "Generate .semantic summaries", 
+                            "name": "Generate semantic summaries",
                             "entry": "semantic generate .",
                             "language": "system",
                             "files": r"\.(py|js|go|ts|tsx|jsx|java|kt|scala|c|cpp|cc|cxx|h|hpp|rs|rb|php|cs|swift|r|R|sql|sh|bash|yaml|yml|json|toml|ini|cfg|md|rst)$",
