@@ -6,10 +6,6 @@ A CLI tool that generates semantic summaries of codebases for AI coding agents.
 
 Semantic creates a "semantic layer" over software codebases, enabling AI coding agents to gain high-level understanding of project structure and content without processing every individual file. The tool generates concise, machine-readable summary files (`agents.md` or `claude.md`) within each directory, providing essential context in a token-efficient manner.
 
-## Problem Statement
-
-Current AI coding agents face token limits and inefficiency when they must ingest large amounts of code into their context window to perform tasks. Semantic solves this by creating structured, high-signal summaries that allow AI agents to navigate and comprehend entire codebases quickly and effectively.
-
 ## Installation
 
 ```bash
@@ -51,10 +47,9 @@ semantic generate --force
 # Enable verbose logging
 semantic generate --verbose
 
-# NEW: Provider auto-inference - no need to specify --provider!
-semantic generate --model gpt-4           # infers openai
-semantic generate --model sonnet          # infers anthropic
-semantic generate --model gemini-2.5-pro  # infers google
+semantic generate --model gpt-5
+semantic generate --model sonnet
+semantic generate --model gemini-2.5-pro
 ```
 
 ### Model Selection
@@ -66,11 +61,6 @@ The tool supports three AI model providers:
 ##### OpenAI
 - **Default Model**: `gpt-5-nano`
 - **Available Models**:
-  - `gpt-4`
-  - `gpt-4-turbo`
-  - `gpt-4o`
-  - `gpt-4o-mini`
-  - `gpt-3.5-turbo`
   - `gpt-5`
   - `gpt-5-mini`
   - `gpt-5-nano`
@@ -98,10 +88,10 @@ semantic generate --provider openai
 semantic generate --provider google
 semantic generate --provider anthropic
 
-# NEW: Simplified usage with automatic provider inference
-semantic generate --model gpt-4           # infers openai
-semantic generate --model sonnet          # infers anthropic
-semantic generate --model gemini-2.5-pro  # infers google
+# Specify model
+semantic generate --model gpt-5
+semantic generate --model sonnet
+semantic generate --model gemini-2.5-pro
 ```
 
 #### Configuration File
@@ -228,7 +218,7 @@ Each summary file includes:
 ### Examples
 
 ```bash
-# Generate agents.md files (new default)
+# Generate agents.md files
 semantic generate
 
 # Generate claude.md files
