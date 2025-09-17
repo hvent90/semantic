@@ -14,6 +14,30 @@ logger = logging.getLogger(__name__)
 class LLMProvider(Enum):
     """Supported LLM providers."""
     OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    GOOGLE = "google"
+
+
+# Available models by provider
+AVAILABLE_MODELS = {
+    LLMProvider.OPENAI: {
+        "default": "gpt-5-nano",
+        "models": ["gpt-4", "gpt-4-turbo", "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo",
+                  "gpt-5", "gpt-5-mini", "gpt-5-nano"]
+    },
+    LLMProvider.ANTHROPIC: {
+        "default": "claude-sonnet-4-20250514",
+        "models": ["claude-sonnet-4-20250514", "claude-opus-4-1-20250805"],
+        "aliases": {
+            "sonnet": "claude-sonnet-4-20250514",
+            "opus": "claude-opus-4-1-20250805"
+        }
+    },
+    LLMProvider.GOOGLE: {
+        "default": "gemini-2.5-flash",
+        "models": ["gemini-2.5-pro", "gemini-2.5-flash"]
+    }
+}
 
 
 @dataclass
@@ -61,6 +85,14 @@ class LLMUsageCollector:
             "gpt-5": {"input": 0.00125, "output": 0.01},
             "gpt-5-mini": {"input": 0.00025, "output": 0.002},
             "gpt-5-nano": {"input": 0.00005, "output": 0.0004},
+        },
+        LLMProvider.ANTHROPIC: {
+            "claude-sonnet-4-20250514": {"input": 0.003, "output": 0.015},
+            "claude-opus-4-1-20250805": {"input": 0.015, "output": 0.075}
+        },
+        LLMProvider.GOOGLE: {
+            "gemini-2.5-pro": {"input": 0.00125, "output": 0.01},  # <=200k tokens
+            "gemini-2.5-flash": {"input": 0.0003, "output": 0.0025}
         }
     }
     

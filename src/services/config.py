@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import List, Optional
 import logging
 
+from services.llm_usage_metrics import LLMProvider, AVAILABLE_MODELS
+
 logger = logging.getLogger(__name__)
 
 
@@ -157,17 +159,41 @@ class SemanticConfig:
             True if configuration file exists, False otherwise
         """
         return self.config_path.exists()
+
+    def get_llm_provider(self) -> LLMProvider:
+        """Get LLM provider from configuration."""
+        provider_str = self._config_data.get('llm', {}).get('provider', 'openai')
+        try:
+            return LLMProvider(provider_str)
+        except ValueError:
+            logger.warning(f"Invalid provider '{provider_str}' in config, using openai")
+            return LLMProvider.OPENAI
+
+    def get_llm_model(self, provider: LLMProvider) -> Optional[str]:
+        """Get LLM model from configuration."""
+        model = self._config_data.get('llm', {}).get('model')
+        if model and model in AVAILABLE_MODELS[provider]["models"]:
+            return model
+        # Check if it's an alias
+        aliases = AVAILABLE_MODELS[provider].get("aliases", {})
+        if model and model in aliases:
+            return aliases[model]
+        return None
     
     def create_example_config(self) -> str:
         """
         Create an example .semanticsrc configuration.
-        
+
         Returns:
             Example configuration as a YAML string
         """
         if HAS_YAML:
             example_config = {
                 'output_format': 'agents',  # Options: agents, claude
+                'llm': {
+                    'provider': 'anthropic',  # openai, anthropic, google
+                    'model': 'sonnet'  # optional, uses provider default if not specified
+                },
                 'exclude': [
                     'node_modules/',
                     '.venv/',
@@ -187,6 +213,11 @@ class SemanticConfig:
             return """# .semanticsrc Example
 # Defines the output file format for generated summaries
 output_format: agents  # Options: agents, claude
+
+# LLM configuration
+llm:
+  provider: anthropic    # openai, anthropic, google
+  model: sonnet         # optional, uses provider default if not specified
 
 # Defines which directories/files to explicitly ignore during traversal.
 exclude:

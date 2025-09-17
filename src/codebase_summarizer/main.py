@@ -7,6 +7,7 @@ from typing import Optional, List
 
 from services.config import SemanticConfig
 from services.llm_client import llm_client
+from services.llm_usage_metrics import LLMProvider, AVAILABLE_MODELS
 
 app = typer.Typer(
     name="semantic",
@@ -25,6 +26,16 @@ def generate(
         dir_okay=True,
         readable=True,
         resolve_path=True,
+    ),
+    provider: str = typer.Option(
+        "openai",
+        "--provider",
+        help="LLM provider to use (openai, anthropic, google)",
+    ),
+    model: Optional[str] = typer.Option(
+        None,
+        "--model",
+        help="Specific model to use (uses provider default if not specified)",
     ),
     force: bool = typer.Option(
         False,
@@ -70,9 +81,64 @@ def generate(
         logging.getLogger("openai").setLevel(logging.WARNING)
     
     logger.info(f"Generating semantic summaries for codebase at: {target_path}")
-    
+
     if force:
         logger.info("Force regeneration enabled")
+
+    # Load configuration
+    config = SemanticConfig(target_path)
+
+    # Determine provider with inference support (CLI > inferred > config > default)
+    if provider == "openai":  # default value, check if we can infer from model
+        if model is not None:
+            # Try to infer provider from model first
+            inferred_provider = _infer_provider_from_model(model)
+            if inferred_provider:
+                llm_provider = inferred_provider
+            else:
+                # Model specified but can't infer provider, will error later in validation
+                llm_provider = config.get_llm_provider()
+        else:
+            # No model specified, use config or default
+            llm_provider = config.get_llm_provider()
+    else:
+        # Provider explicitly specified, validate it
+        try:
+            llm_provider = LLMProvider(provider)
+        except ValueError:
+            valid_providers = [p.value for p in LLMProvider]
+            typer.echo(f"✗ Invalid provider '{provider}'. Valid options: {', '.join(valid_providers)}", err=True)
+            raise typer.Exit(1)
+
+    # Log provider inference for transparency
+    if provider == "openai" and model is not None and llm_provider != LLMProvider.OPENAI:
+        logger.info(f"Inferred provider '{llm_provider.value}' from model '{model}'")
+
+    # Determine model (CLI > config > provider default)
+    if model is None:
+        model = config.get_llm_model(llm_provider)
+
+    # Validate and resolve model if specified
+    if model:
+        resolved_model = _resolve_model_alias(llm_provider, model)
+        if not resolved_model:
+            # Check if user provided a model for wrong provider
+            correct_provider = _infer_provider_from_model(model)
+            if correct_provider and correct_provider != llm_provider:
+                typer.echo(f"✗ Model '{model}' belongs to {correct_provider.value}, but {llm_provider.value} provider was specified.", err=True)
+                typer.echo(f"💡 Try: --model {model} (without --provider) or --provider {correct_provider.value} --model {model}", err=True)
+            else:
+                available = AVAILABLE_MODELS[llm_provider]["models"]
+                aliases = AVAILABLE_MODELS[llm_provider].get("aliases", {})
+                all_options = list(available) + list(aliases.keys())
+                typer.echo(f"✗ Invalid model '{model}' for {llm_provider.value}. Available: {', '.join(all_options)}", err=True)
+            raise typer.Exit(1)
+        model = resolved_model
+
+    # Initialize LLM client with selected provider/model
+    from services.llm_client import LLMClient
+    global llm_client
+    llm_client = LLMClient(provider=llm_provider, model=model)
     
     try:
         # Initialize components
@@ -212,6 +278,48 @@ async def _process_directories_async(traversal_engine, orchestrator, logger, for
             logger.error(f"Task failed: {e}")
     
     return directories_processed
+
+
+def _resolve_model_alias(provider: LLMProvider, model: str) -> Optional[str]:
+    """Resolve model alias to full model name."""
+    provider_config = AVAILABLE_MODELS[provider]
+
+    # Check if it's already a valid full model name
+    if model in provider_config["models"]:
+        return model
+
+    # Check if it's an alias
+    aliases = provider_config.get("aliases", {})
+    if model in aliases:
+        return aliases[model]
+
+    return None
+
+
+def _infer_provider_from_model(model: str) -> Optional[LLMProvider]:
+    """
+    Infer the LLM provider from a model name by checking all available models and aliases.
+
+    Args:
+        model: The model name to analyze
+
+    Returns:
+        The inferred LLMProvider, or None if no match found
+    """
+    # Check each provider's models and aliases
+    for provider in LLMProvider:
+        provider_config = AVAILABLE_MODELS[provider]
+
+        # Check direct model name match
+        if model in provider_config["models"]:
+            return provider
+
+        # Check alias match
+        aliases = provider_config.get("aliases", {})
+        if model in aliases:
+            return provider
+
+    return None
 
 
 @app.command()
